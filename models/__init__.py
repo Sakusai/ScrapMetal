@@ -1,0 +1,1 @@
+from .cours import Base, Cours
