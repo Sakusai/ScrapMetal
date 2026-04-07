@@ -9,87 +9,66 @@
 
 #     page.goto("http://boursorama.com/bourse/actions/cotations/")
 
-from db.database import Base, engine, SessionLocal
-from models.cours import Cours
 
-# Créer les tables
+from datetime import date, datetime
+from decimal import Decimal
+
+import models
+from db.database import Base, SessionLocal, engine
+from models import CurrencyEnum, DailyQuote, LiveQuote, Stock
+
+
 def create_tables():
     print("Création des tables...")
     Base.metadata.create_all(bind=engine)
     print("Tables créées avec succès !")
 
-# Ajouter des cours
-def add_cours():
+
+def drop_tables():
+    print("Suppression des tables...")
+    Base.metadata.drop_all(bind=engine)
+    print("Tables supprimées avec succès !")
+
+
+def recreate_tables():
+    drop_tables()
+    create_tables()
+
+
+def purge_live_quotes():
     session = SessionLocal()
     try:
-        cours1 = Cours(name="ACCOR")
-        session.add_all([cours1])
+        deleted_count = session.query(LiveQuote).delete()
         session.commit()
-        print("Cours ajoutés avec succès !")
+        print(f"{deleted_count} live quotes supprimées.")
     finally:
         session.close()
 
-# Lire tous les cours
-def get_cours():
+
+def purge_daily_quotes():
     session = SessionLocal()
     try:
-        cours = session.query(Cours).all()
-        for c in cours:
-            print(f"ID: {c.id_cours}, Name: {c.name}")
+        deleted_count = session.query(DailyQuote).delete()
+        session.commit()
+        print(f"{deleted_count} daily quotes supprimées.")
     finally:
         session.close()
 
-# Mettre à jour un cours
-def update_cours(cours_id, new_name):
+
+def purge_stocks():
     session = SessionLocal()
     try:
-        cours = session.query(Cours).filter(Cours.id_cours == cours_id).first()
-        if cours:
-            cours.name = new_name
-            session.commit()
-            print(f"Cours {cours_id} mis à jour avec succès !")
-        else:
-            print(f"Aucun cours trouvé avec l'ID {cours_id}")
+        deleted_count = session.query(Stock).delete()
+        session.commit()
+        print(f"{deleted_count} stocks supprimés.")
     finally:
         session.close()
 
-# Supprimer un cours
-def delete_cours(cours_id):
-    session = SessionLocal()
-    try:
-        cours = session.query(Cours).filter(Cours.id_cours == cours_id).first()
-        if cours:
-            session.delete(cours)
-            session.commit()
-            print(f"Cours {cours_id} supprimé avec succès !")
-        else:
-            print(f"Aucun cours trouvé avec l'ID {cours_id}")
-    finally:
-        session.close()
+def purge_all():
+    purge_live_quotes()
+    purge_daily_quotes()
+    purge_stocks()
 
-# Menu principal
+
 if __name__ == "__main__":
-    print("Options disponibles :")
-    print("1 : Créer les tables")
-    print("2 : Ajouter des cours")
-    print("3 : Lire les cours")
-    print("4 : Mettre à jour un cours")
-    print("5 : Supprimer un cours")
-
-    choice = input("Entrez le numéro de l'opération : ")
-
-    if choice == "1":
-        create_tables()
-    elif choice == "2":
-        add_cours()
-    elif choice == "3":
-        get_cours()
-    elif choice == "4":
-        cours_id = int(input("ID du cours à mettre à jour : "))
-        new_name = input("Nouveau nom : ")
-        update_cours(cours_id, new_name)
-    elif choice == "5":
-        cours_id = int(input("ID du cours à supprimer : "))
-        delete_cours(cours_id)
-    else:
-        print("Choix invalide.")
+    pass

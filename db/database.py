@@ -37,7 +37,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_session():
-    """Créer une session pour les opérations sur la base."""
     session = SessionLocal()
     try:
         yield session
