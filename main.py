@@ -47,7 +47,7 @@ if __name__ == "__main__":
     print("Scraping live quote...")
     scrape_live_quote()
 
-    print(db.execute("SELECT * FROM stock;"))
-    print(db.execute("SELECT * FROM quote_live;"))
+    print(db.execute("SELECT * FROM stock;").fetchall())
+    print(db.execute("SELECT * FROM quote_live;").fetchall())
 
     db.close()

@@ -94,10 +94,10 @@ def scrape_boursorama_stock(url: str) -> dict:
         try:
             data_block = faceplate.locator("div.c-faceplate__data").first
 
-            # TODO: data["open"] = parse_float_fr(data_block.locator("div.c-faceplate__open").first.inner_text().strip())
-            # TODO: data["high"] = parse_float_fr(data_block.locator("div.c-faceplate__high").first.inner_text().strip())
-            # TODO: data["low"] = parse_float_fr(data_block.locator("div.c-faceplate__low").first.inner_text().strip())
-            # TODO: data["volume"] = parse_float_fr(data_block.locator("div.c-faceplate__volume").first.inner_text().strip())
+            data["open"] = parse_float_fr(data_block.locator("span.c-instrument.c-instrument--open").first.inner_text().strip())
+            data["high"] = parse_float_fr(data_block.locator("span.c-instrument.c-instrument--high").first.inner_text().strip())
+            data["low"] = parse_float_fr(data_block.locator("span.c-instrument.c-instrument--low").first.inner_text().strip())
+            data["volume"] = parse_float_fr(data_block.locator("span.c-instrument.c-instrument--totalvolume").first.inner_text().strip())
         except Exception:
             pass
 
