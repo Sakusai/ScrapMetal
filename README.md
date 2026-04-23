@@ -34,15 +34,18 @@ To install packages from a requirements.txt file, do the following :
 
 
 
-### Pip-autoremove
+### Pipdeptree
 
-This package removes a specified package and its unused dependencies, helping to clean up your Python environment.
+This package displays the dependency tree of installed Python packages, helping you understand which packages depend on which others in your environment.
 
-To install pip-autoremove, run:  
-`pip install pip-autoremove`
+To install pipdeptree, run:
+`pip install pipdeptree`
 
-To remove a package (or multiple) and its unused dependencies, use:  
-`pip-autoremove <package_name1> <package_name2> ... -y`
+To display the full dependency tree, use:
+`pipdeptree`
 
-To list unused dependencies without uninstalling them, use the -l flag:  
-`pip-autoremove -l`
+To display the dependency tree for a specific package, use:
+`pipdeptree -p <package-name>`
+
+To find possible conflicting dependencies, use:
+`pipdeptree --warn fail`
