@@ -1,63 +1,43 @@
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import datetime
+from scrapper import scrape_boursorama_stock
+import db.dbactions as dba
 
-import models
-from db.database import Base, SessionLocal, engine
-from models import CurrencyEnum, DailyQuote, LiveQuote, Stock
-from scrapper import scrape
+db = dba.Database()
+db.connect()
 
+def init():
+    print("DB > Création des tables...")
+    db.recreate_tables()
+    print("DB > Tables créées avec succès !")
+    print("DB > Initialisation des données de base...")
+    db.insert_currency("EUR")
+    print("DB > Données de base initialisées avec succès !\n")
 
-def create_tables():
-    print("Création des tables...")
-    Base.metadata.create_all(bind=engine)
-    print("Tables créées avec succès !")
-
-
-def drop_tables():
-    print("Suppression des tables...")
-    Base.metadata.drop_all(bind=engine)
-    print("Tables supprimées avec succès !")
-
-
-def recreate_tables():
-    drop_tables()
-    create_tables()
-
-
-def purge_live_quotes():
-    session = SessionLocal()
-    try:
-        deleted_count = session.query(LiveQuote).delete()
-        session.commit()
-        print(f"{deleted_count} live quotes supprimées.")
-    finally:
-        session.close()
-
-
-def purge_daily_quotes():
-    session = SessionLocal()
-    try:
-        deleted_count = session.query(DailyQuote).delete()
-        session.commit()
-        print(f"{deleted_count} daily quotes supprimées.")
-    finally:
-        session.close()
-
-
-def purge_stocks():
-    session = SessionLocal()
-    try:
-        deleted_count = session.query(Stock).delete()
-        session.commit()
-        print(f"{deleted_count} stocks supprimés.")
-    finally:
-        session.close()
-
-def purge_all():
-    purge_live_quotes()
-    purge_daily_quotes()
-    purge_stocks()
-
+def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
+    stock = scrape_boursorama_stock(url)
+    print(stock)
+    db.cursor.execute("SELECT id_stock FROM stock WHERE isin = ?", (stock.get("isin"),))
+    result = db.cursor.fetchone()
+    if result:
+        id_stock = result[0]
+    else:
+        id_currency = db.cursor.execute("SELECT id_currency FROM currency WHERE code = 'EUR'").fetchone()[0]
+        id_stock = db.insert_stock(
+            isin=stock["isin"], 
+            symbol=stock["symbol"], 
+            label=stock["stock_label"], 
+            boursorama_url=url, 
+            id_currency=id_currency #Currency EUR by default, but could be automated
+        )
+    db.insert_quote_live(
+        id_stock,
+        stock.get("collected_at", datetime.now().isoformat()),
+        stock.get("market_price"),
+        stock.get("open"),
+        stock.get("high"),
+        stock.get("low"),
+        stock.get("volume")
+    )
 
 if __name__ == "__main__":
     scrape()
