@@ -40,4 +40,14 @@ def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
     )
 
 if __name__ == "__main__":
-    scrape()
+    # init()
+    db.purge_data()
+    db.insert_currency("EUR")
+
+    print("Scraping live quote...")
+    scrape_live_quote()
+
+    print(db.execute("SELECT * FROM stock;"))
+    print(db.execute("SELECT * FROM quote_live;"))
+
+    db.close()

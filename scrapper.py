@@ -3,14 +3,31 @@ from datetime import datetime
 import pandas as pd
 import re
 
-def scrape_boursorama_action(url: str) -> dict:
-    """
-    Scrape les données du cours du jour d'une action Boursorama.
-    Compatible avec les URLs de type : https://www.boursorama.com/cours/1rP74SW/
+def load_page(page, url: str):
+    page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+    page.wait_for_load_state("networkidle")
+    page.locator("div.c-faceplate").first.wait_for(timeout=15_000)
 
-    Returns:
-        dict avec : collecte_at, nom_action, isin, cours, variation,
-                    cours_ouverture, cours_haut, cours_bas, volume, dernier_echange
+def parse_float_fr(text: str) -> float | None:
+    if not text:
+        return None
+    try:
+        cleaned = text.strip().replace("\xa0", " ")
+        cleaned = re.sub(r"[^\d,.\- ]", "", cleaned)
+        cleaned = cleaned.replace(" ", "").replace(",", ".")
+        parts = cleaned.split(".")
+        if len(parts) > 2:
+            cleaned = "".join(parts[:-1]) + "." + parts[-1]
+        return float(cleaned) if cleaned else None
+    except Exception:
+        return None
+
+def scrape_boursorama_stock(url: str) -> dict:
+    """
+    Scrape a Boursorama stock's daily data.
+    Compatible with such URLs : https://www.boursorama.com/cours/1rP74SW/
+
+    Returns a Dict : {collected_at, stock_label, isin, market_price, variation, open, high, low, volume}
     """
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
@@ -23,132 +40,94 @@ def scrape_boursorama_action(url: str) -> dict:
         )
         page = context.new_page()
 
-        collecte_at = datetime.now()
-        page.goto(url, wait_until="domcontentloaded", timeout=30_000)
-        page.wait_for_selector("h1", timeout=15_000)
+        collected_at = datetime.now()
+        load_page(page, url)
 
         data = {
-            "collected_at": collecte_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "collected_at": collected_at.strftime("%Y-%m-%d %H:%M:%S"),
             "url": url,
-            "nom_action": None,
+            "symbol": None,
+            "stock_label": None,
             "isin": None,
-            "cours": None,
+            "market_price": None,
+            "currency": None,
             "variation": None,
-            "cours_ouverture": None,
-            "cours_haut": None,
-            "cours_bas": None,
+            "open": None,
+            "high": None,
+            "low": None,
             "volume": None,
-            "dernier_echange": None,
         }
 
-        body_text = page.locator("body").inner_text()
+        faceplate = page.locator("div.c-faceplate").first
 
+        # 1. ISIN & Symbol
         try:
-            h1 = page.locator("h1").first.inner_text().strip()
-            data["nom_action"] = re.sub(r"^Cours\s+", "", h1)
+            fullISIN = faceplate.locator("h2.c-faceplate__isin").inner_text().strip().split(" ")
+            data["isin"] = fullISIN[0]
+            data["symbol"] = fullISIN[1]
         except Exception:
             pass
 
+        # 2. Stock label
         try:
-            m = re.search(r"\b([A-Z]{2}[A-Z0-9]{10})\b", body_text)
-            if m:
-                data["isin"] = m.group(1)
+            title_block = faceplate.locator("h1.c-faceplate__company-title").first
+            data["stock_label"] = title_block.locator("a.c-faceplate__company-link").inner_text().strip()
         except Exception:
             pass
 
+        # 3. Market price & currency & variation
         try:
-            for part in page.title().split():
-                val = _parse_float(part)
-                if val and val > 0:
-                    data["cours"] = val
-                    break
+            values_block = faceplate.locator("div.c-faceplate__values").first
+
+            price_block = values_block.locator("div.c-faceplate__price").first
+            price_text = price_block.locator("span.c-instrument.c-instrument--last").inner_text().strip()
+            data["market_price"] = parse_float_fr(price_text)
+            data["currency"] = price_block.locator("span.c-faceplate__price-currency").inner_text().strip()
+
+            variation_block = values_block.locator("div.c-faceplate__fluctuation").first
+            variation_text = variation_block.locator("span.c-instrument.c-instrument--variation").inner_text().strip()
+            data["variation"] = parse_float_fr(variation_text)
         except Exception:
             pass
 
+        # 4. Open & High & Low & Volume
         try:
-            m = re.search(r"([+-][\d,\s]+%)", body_text)
-            if m:
-                data["variation"] = m.group(1).strip()
+            data_block = faceplate.locator("div.c-faceplate__data").first
+
+            # TODO: data["open"] = parse_float_fr(data_block.locator("div.c-faceplate__open").first.inner_text().strip())
+            # TODO: data["high"] = parse_float_fr(data_block.locator("div.c-faceplate__high").first.inner_text().strip())
+            # TODO: data["low"] = parse_float_fr(data_block.locator("div.c-faceplate__low").first.inner_text().strip())
+            # TODO: data["volume"] = parse_float_fr(data_block.locator("div.c-faceplate__volume").first.inner_text().strip())
         except Exception:
             pass
-
-
-        t = body_text.lower()
-
-        patterns = {
-            "cours_ouverture": r"ouverture\s*\n\s*([\d\s]+[,.][\d]+)",
-            "cours_haut":      r"\+\s*haut\s*\n\s*([\d\s]+[,.][\d]+)",
-            "cours_bas":       r"\+\s*bas\s*\n\s*([\d\s]+[,.][\d]+)",
-            "volume":          r"volume\s*\n\s*([\d\s]+)\n",
-            "dernier_echange": r"dernier échange\s*\n\s*(.+)",
-        }
-
-        for key, pattern in patterns.items():
-            m = re.search(pattern, t)
-            if m:
-                raw = m.group(1)
-                if key == "volume":
-                    data[key] = _parse_volume(raw)
-                elif key == "dernier_echange":
-                    data[key] = raw.strip()
-                else:
-                    data[key] = _parse_float(raw)
 
         browser.close()
         return data
 
+# def scrape_multiple_actions(urls: list[str]) -> pd.DataFrame:
+#     """Scrape multiple stocks and return a consolidated DataFrame."""
+#     results = []
+#     for url in urls:
+#         print(f"Scraping : {url}")
+#         try:
+#             row = scrape_boursorama_stock(url)
+#             results.append(row)
+#             print(f"  ✓ {row['stock_label']} — stock : {row['market_price']}")
+#         except Exception as e:
+#             print(f"  ✗ Erreur : {e}")
+#             results.append({"url": url, "erreur": str(e)})
+#     return pd.DataFrame(results)
 
-def scrape_multiple_actions(urls: list[str]) -> pd.DataFrame:
-    """Scrape plusieurs actions et retourne un DataFrame consolidé."""
-    results = []
-    for url in urls:
-        print(f"Scraping : {url}")
-        try:
-            row = scrape_boursorama_action(url)
-            results.append(row)
-            print(f"  ✓ {row['nom_action']} — cours : {row['cours']}")
-        except Exception as e:
-            print(f"  ✗ Erreur : {e}")
-            results.append({"url": url, "erreur": str(e)})
-    return pd.DataFrame(results)
+# def scrape():
+#     URLS = [
+#         "https://www.boursorama.com/cours/1rP74SW/",   
+#         "https://www.boursorama.com/cours/1rPAIR/",  
+#     ]
 
+#     df = scrape_multiple_actions(URLS)
 
+#     print("\n=== Result ===")
+#     print(df.to_string(index=False))
 
-def _parse_float(text: str) -> float | None:
-    """'1 234,56' ou '32,9000 EUR'  →  float"""
-    if not text:
-        return None
-    try:
-        cleaned = re.sub(r"[^\d,.\-]", "", text.strip()).replace(",", ".")
-        parts = cleaned.split(".")
-        if len(parts) > 2:
-            cleaned = "".join(parts[:-1]) + "." + parts[-1]
-        return float(cleaned) if cleaned else None
-    except Exception:
-        return None
-
-
-def _parse_volume(text: str) -> int | None:
-    """'12 345'  →  12345"""
-    if not text:
-        return None
-    try:
-        cleaned = re.sub(r"[^\d]", "", text)
-        return int(cleaned) if cleaned else None
-    except Exception:
-        return None
-
-
-def scrape():
-    URLS = [
-        "https://www.boursorama.com/cours/1rP74SW/",   
-        "https://www.boursorama.com/cours/1rPAIR/",  
-    ]
-
-    df = scrape_multiple_actions(URLS)
-
-    print("\n=== Résultat ===")
-    print(df.to_string(index=False))
-
-    df.to_csv("boursorama_cours.csv", index=False, encoding="utf-8-sig")
-    print("\nCSV exporté : boursorama_cours.csv")
+#     df.to_csv("boursorama_cours.csv", index=False, encoding="utf-8-sig")
+#     print("\nCSV exported : boursorama_cours.csv")
