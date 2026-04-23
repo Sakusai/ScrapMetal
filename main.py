@@ -1,21 +1,10 @@
-# from playwright.sync_api import sync_playwright
-# import re
-# import pandas as pd
-# from pathlib import Path
-
-# with sync_playwright() as pw:
-#     browser = p.chromium.launch(headless=False)
-#     page = browser.new_page()
-
-#     page.goto("http://boursorama.com/bourse/actions/cotations/")
-
-
 from datetime import date, datetime
 from decimal import Decimal
 
 import models
 from db.database import Base, SessionLocal, engine
 from models import CurrencyEnum, DailyQuote, LiveQuote, Stock
+from scrapper import scrape
 
 
 def create_tables():
@@ -71,4 +60,4 @@ def purge_all():
 
 
 if __name__ == "__main__":
-    pass
+    scrape()
