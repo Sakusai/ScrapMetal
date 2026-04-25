@@ -37,7 +37,7 @@ class Database:
         self.execute("""
             CREATE TABLE IF NOT EXISTS stock (
                 id_stock INTEGER PRIMARY KEY AUTOINCREMENT,
-                isin TEXT NOT NULL UNIQUE,
+                ticker TEXT NOT NULL UNIQUE,
                 symbol TEXT NOT NULL UNIQUE,
                 label TEXT NOT NULL,
                 boursorama_url TEXT,
@@ -112,11 +112,11 @@ class Database:
         self.commit()
         return self.cursor.lastrowid
     
-    def insert_stock(self, symbol, label, isin, boursorama_url, id_currency):
+    def insert_stock(self, symbol, label, ticker, boursorama_url, id_currency):
         self.execute("""
-            INSERT INTO stock (symbol, label, isin, boursorama_url, id_currency) 
+            INSERT INTO stock (symbol, label, ticker, boursorama_url, id_currency) 
             VALUES (?, ?, ?, ?, ?);
-        """, (symbol, label, isin, boursorama_url, id_currency))
+        """, (symbol, label, ticker, boursorama_url, id_currency))
         self.commit()
         return self.cursor.lastrowid
     

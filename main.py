@@ -1,5 +1,5 @@
 from datetime import datetime
-from scrapper import scrape_boursorama_stock
+from scrapper import scrape_boursorama_stock_live
 import db.dbactions as dba
 
 db = dba.Database()
@@ -14,21 +14,24 @@ def init():
     print("DB > Données de base initialisées avec succès !\n")
 
 def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
-    stock = scrape_boursorama_stock(url)
+    stock = scrape_boursorama_stock_live(url)
     print(stock)
-    db.cursor.execute("SELECT id_stock FROM stock WHERE isin = ?", (stock.get("isin"),))
+
+    db.cursor.execute("SELECT id_stock FROM stock WHERE ticker = ?", (stock.get("ticker"),))
     result = db.cursor.fetchone()
+
     if result:
         id_stock = result[0]
     else:
         id_currency = db.cursor.execute("SELECT id_currency FROM currency WHERE code = 'EUR'").fetchone()[0]
         id_stock = db.insert_stock(
-            isin=stock["isin"], 
+            ticker=stock["ticker"], 
             symbol=stock["symbol"], 
             label=stock["stock_label"], 
             boursorama_url=url, 
             id_currency=id_currency #Currency EUR by default, but could be automated
         )
+
     db.insert_quote_live(
         id_stock,
         stock.get("collected_at", datetime.now().isoformat()),
@@ -38,6 +41,9 @@ def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
         stock.get("low"),
         stock.get("volume")
     )
+
+def scrape_daily_quote(tickers: list[str]) -> None:
+    pass
 
 if __name__ == "__main__":
     # init()
