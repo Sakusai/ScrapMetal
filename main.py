@@ -1,5 +1,7 @@
 from datetime import datetime
-from scrapper import scrape_boursorama_stock_live
+from scrapper import scrape_boursorama_stock_daily, scrape_boursorama_stock_live
+from auth import authenticate
+
 import db.dbactions as dba
 
 db = dba.Database()
@@ -43,15 +45,16 @@ def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
     )
 
 def scrape_daily_quote(tickers: list[str]) -> None:
-    pass
+    for ticker in tickers:
+        scrape_boursorama_stock_daily(ticker) #TODO
 
 if __name__ == "__main__":
-    init(purgeOnly=False)
+    # init(purgeOnly=False)
 
-    print("Scraping live quote...")
-    scrape_live_quote()
+    # print("Scraping live quote...")
+    # scrape_live_quote()
 
-    print(db.execute("SELECT * FROM stock;").fetchall())
-    print(db.execute("SELECT * FROM quote_live;").fetchall())
+    print("Scraping daily quote...")
+    scrape_daily_quote(["FR0000133308"])
 
     db.close()
