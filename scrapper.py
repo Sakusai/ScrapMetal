@@ -1,6 +1,5 @@
 from playwright.sync_api import sync_playwright
 from datetime import datetime
-import pandas as pd
 import re
 
 def load_page(page, url: str):
@@ -187,31 +186,3 @@ def scrape_boursorama_stock_daily(ticker: str) -> dict:
 
         browser.close()
         return data
-
-# def scrape_multiple_actions(urls: list[str]) -> pd.DataFrame:
-#     """Scrape multiple stocks and return a consolidated DataFrame."""
-#     results = []
-#     for url in urls:
-#         print(f"Scraping : {url}")
-#         try:
-#             row = scrape_boursorama_stock_live(url)
-#             results.append(row)
-#             print(f"  ✓ {row['stock_label']} — stock : {row['market_price']}")
-#         except Exception as e:
-#             print(f"  ✗ Erreur : {e}")
-#             results.append({"url": url, "erreur": str(e)})
-#     return pd.DataFrame(results)
-
-# def scrape():
-#     URLS = [
-#         "https://www.boursorama.com/cours/1rP74SW/",   
-#         "https://www.boursorama.com/cours/1rPAIR/",  
-#     ]
-
-#     df = scrape_multiple_actions(URLS)
-
-#     print("\n=== Result ===")
-#     print(df.to_string(index=False))
-
-#     df.to_csv("boursorama_cours.csv", index=False, encoding="utf-8-sig")
-#     print("\nCSV exported : boursorama_cours.csv")
