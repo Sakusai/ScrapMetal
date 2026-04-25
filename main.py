@@ -5,9 +5,9 @@ import db.dbactions as dba
 db = dba.Database()
 db.connect()
 
-def init():
+def init(purgeOnly: bool = False):
     print("DB > Création des tables...")
-    db.recreate_tables()
+    db.purge_tables() if purgeOnly else db.recreate_tables()
     print("DB > Tables créées avec succès !")
     print("DB > Initialisation des données de base...")
     db.insert_currency("EUR")
@@ -46,9 +46,7 @@ def scrape_daily_quote(tickers: list[str]) -> None:
     pass
 
 if __name__ == "__main__":
-    # init()
-    db.purge_data()
-    db.insert_currency("EUR")
+    init(purgeOnly=False)
 
     print("Scraping live quote...")
     scrape_live_quote()
