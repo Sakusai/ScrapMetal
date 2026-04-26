@@ -118,7 +118,7 @@ def fill_download_form(form, tickers: list[str], dateStart: str = None, dateEnd:
     tickers_input.fill(ticker_input_string)
 
     # Deselect currency data
-    form.locator('input[name="quote_search[currency]"]').dispatch_event("click")
+    # form.locator('input[name="quote_search[currency]"]').dispatch_event("click")
     
     # Select period
     if dateStart:
@@ -148,7 +148,7 @@ def scrape_boursorama_stock_daily(tickers: list[str], dateStart: str = None, dat
     storage_path = "playwright/.auth/state.json"
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
+        browser = pw.chromium.launch(headless=True)
 
         context_args = {
             "user_agent": (
