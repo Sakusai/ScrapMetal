@@ -70,6 +70,7 @@ def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None
     print(f"Daily quote data downloaded to : {file_path}")
 
     # Parse file
+    print("Parsing daily quote data...")
     with open(file_path, "r") as f:
         stocks = []
         for line in f:
@@ -78,16 +79,21 @@ def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None
     f.close()
 
     # Scraping live quote inserts stock into DB, so if stock from tickers is not already present, we insert
+    ticker_to_id_stock = {}
     for ticker in tickers:
         db.cursor.execute("SELECT id_stock FROM stock WHERE ticker = ?", (ticker,))
         result = db.cursor.fetchone()
         if not result:
-            id_stock = scrape_live_quote(f"https://www.boursorama.com/cours/{ticker}/")
+            ticker_to_id_stock[ticker] = scrape_live_quote(ticker)
         else:
-            id_stock = result[0]
+            ticker_to_id_stock[ticker] = result[0]
 
     # Insert data into DB
+    print("Inserting daily quote data into DB...")
     for stock in stocks:
+        ticker = stock[0]
+        id_stock = ticker_to_id_stock[ticker]
+
         db.upsert_quote_daily(
             id_stock,
             stock[2], # date
@@ -99,12 +105,14 @@ def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None
         )
 
 if __name__ == "__main__":
-    # init(purgeOnly=False)
+    init(purgeOnly=False)
 
-    # print("Scraping live quote...")
-    # scrape_live_quote()
+    print("Scraping live quote...")
+    scrape_live_quote("FR0000121014") # LVMH
 
     print("Scraping daily quote...")
-    scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026")
+    scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026") # ORANGE & AIRBUS
+
+    print("Done !")
 
     db.close()
