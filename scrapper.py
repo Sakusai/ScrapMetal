@@ -109,7 +109,42 @@ def scrape_boursorama_stock_live(url: str) -> dict:
 def has_download_form(page) -> bool:
     return page.locator('form[name="quote_search"]').count() == 1
 
-def scrape_boursorama_stock_daily(ticker: str) -> dict:
+def fill_download_form(form, tickers: list[str], dateStart: str = None, dateEnd: str = None):
+    # Select quote search type "Custom indexes list"
+    form.locator('label[for="quote_search_type_1"]').dispatch_event("click")
+
+    ticker_input_string = ",".join(tickers)
+    tickers_input = form.locator('input[name="quote_search[customIndexesList]"]')
+    tickers_input.fill(ticker_input_string)
+
+    # Deselect currency data
+    form.locator('input[name="quote_search[currency]"]').dispatch_event("click")
+    
+    # Select period
+    if dateStart:
+        form.locator('input[name="quote_search[startDate]"]').fill(dateStart)
+    if dateEnd:
+        form.locator('input[name="quote_search[endDate]"]').fill(dateEnd)
+
+    # Select decimal separator -> POINT
+    decimal_format_select = form.locator('select[name="quote_search[decimalFormat]"]')
+    decimal_format_select.select_option(value="POINT", force=True)
+
+def scrape_boursorama_stock_daily(tickers: list[str], dateStart: str = None, dateEnd: str = None) -> str:
+    """
+    Scrape a Boursorama stock's daily data.
+    Compatible with such Tickers : FR0000133308
+
+    Returns a path to the file downloaded from Boursorama, containing the historical data for the given tickers and period.
+    The dates given refer to the period of data to download. The default period will be from yesterday to yesterday at the time of execution.
+
+    Note: session persistence for the authenticated Boursorama download flow has been identified as partially unreliable.
+
+    In practice, the saved Playwright storage state may remain valid enough to access the download page and display the form, 
+    while still being too old to authorize the actual file download request. 
+    -> Not a priority to fix... For now, deleting the stored session state and re-authenticating resolves the issue when it occurs.
+    """
+
     storage_path = "playwright/.auth/state.json"
 
     with sync_playwright() as pw:
@@ -120,7 +155,8 @@ def scrape_boursorama_stock_daily(ticker: str) -> dict:
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/120.0.0.0 Safari/537.36"
-            )
+            ),
+            "accept_downloads": True
         }
 
         if path.exists(storage_path):
@@ -148,23 +184,22 @@ def scrape_boursorama_stock_daily(ticker: str) -> dict:
             if not has_download_form(page):
                 browser.close()
                 raise RuntimeError("Authenticated, but download form still not found.")
+        else:
+            print("Using cached session...")
 
         # Suppose the form exists
         form = page.locator('form[name="quote_search"]').first
         print("Form OK:", form.count())
 
-        data = {
-            "ticker": None,
-            "stock_label": None,
-            "date": None,
-            "open": None,
-            "high": None,
-            "low": None,
-            "close": None,
-            "volume": None,
-        }
+        # Form filling
+        fill_download_form(form, tickers, dateStart, dateEnd)
 
-        #TODO: fill the form with the ticker, submit it, wait for results, parse results
+        # Download
+        with page.expect_download() as download_info:
+            form.evaluate("(f) => f.submit()")
+
+        download = download_info.value
+        download.save_as("downloads/boursorama_daily_export.txt")
 
         browser.close()
-        return data
+        return path.abspath("downloads/boursorama_daily_export.txt")

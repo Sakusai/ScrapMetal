@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from scrapper import scrape_boursorama_stock_daily, scrape_boursorama_stock_live
-from auth import authenticate
 
+import re
 import db.dbactions as dba
 
 db = dba.Database()
@@ -44,9 +44,30 @@ def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
         stock.get("volume")
     )
 
-def scrape_daily_quote(tickers: list[str]) -> None:
-    for ticker in tickers:
-        scrape_boursorama_stock_daily(ticker) #TODO
+def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None:
+    # Arguments validation
+    if not tickers:
+        raise ValueError("At least one ticker must be provided.")
+    if dateStart and not re.match(r"\d{2}/\d{2}/\d{4}", dateStart):
+        raise ValueError("dateStart must be in DD/MM/YYYY format.")
+    if dateEnd and not re.match(r"\d{2}/\d{2}/\d{4}", dateEnd):
+        raise ValueError("dateEnd must be in DD/MM/YYYY format.")
+    
+    start_date = datetime.strptime(dateStart, "%d/%m/%Y").date() if dateStart else None
+    end_date = datetime.strptime(dateEnd, "%d/%m/%Y").date() if dateEnd else None
+    
+    if start_date and end_date and start_date > end_date:
+        raise ValueError("dateStart cannot be after dateEnd.")
+    
+    # Because we scrape daily data, quotes have to be closed, so dateStart and dateEnd cannot be later than yesterday
+    yesterday = datetime.now().date() - timedelta(days=1)
+    if (start_date and start_date > yesterday) or (end_date and end_date > yesterday):
+        raise ValueError("dateStart and dateEnd cannot be in the future.")
+        
+    file_path = scrape_boursorama_stock_daily(tickers, dateStart, dateEnd)
+    print(f"Daily quote data downloaded to : {file_path}")
+
+    #TODO : parse file and insert data into DB
 
 if __name__ == "__main__":
     # init(purgeOnly=False)
@@ -55,6 +76,6 @@ if __name__ == "__main__":
     # scrape_live_quote()
 
     print("Scraping daily quote...")
-    scrape_daily_quote(["FR0000133308"])
+    scrape_daily_quote(["FR0000133308"], "01/01/2026", "01/03/2026")
 
     db.close()
