@@ -52,10 +52,8 @@ def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None
         raise ValueError("dateStart must be in DD/MM/YYYY format.")
     if dateEnd and not re.match(r"\d{2}/\d{2}/\d{4}", dateEnd):
         raise ValueError("dateEnd must be in DD/MM/YYYY format.")
-    
     start_date = datetime.strptime(dateStart, "%d/%m/%Y").date() if dateStart else None
     end_date = datetime.strptime(dateEnd, "%d/%m/%Y").date() if dateEnd else None
-    
     if start_date and end_date and start_date > end_date:
         raise ValueError("dateStart cannot be after dateEnd.")
     
@@ -64,10 +62,38 @@ def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None
     if (start_date and start_date > yesterday) or (end_date and end_date > yesterday):
         raise ValueError("dateStart and dateEnd cannot be in the future.")
         
+    # Scrape data
     file_path = scrape_boursorama_stock_daily(tickers, dateStart, dateEnd)
     print(f"Daily quote data downloaded to : {file_path}")
 
-    #TODO : parse file and insert data into DB
+    # Parse file
+    with open(file_path, "r") as f:
+        stocks = []
+        for line in f:
+            stocks.append(line.strip().split("\t"))
+        stocks.pop(0) # Remove header line
+    f.close()
+
+    # Scraping live quote inserts stock into DB, so if stock from tickers is not already present, we insert
+    for ticker in tickers:
+        db.cursor.execute("SELECT id_stock FROM stock WHERE ticker = ?", (ticker,))
+        result = db.cursor.fetchone()
+        if not result:
+            id_stock = scrape_live_quote(f"https://www.boursorama.com/cours/{ticker}/")
+        else:
+            id_stock = result[0]
+
+    # Insert data into DB
+    for stock in stocks:
+        db.upsert_quote_daily(
+            id_stock,
+            stock[2], # date
+            stock[3], # open
+            stock[4], # high
+            stock[5], # low
+            stock[6], # close
+            stock[7]  # volume
+        )
 
 if __name__ == "__main__":
     # init(purgeOnly=False)
@@ -76,6 +102,6 @@ if __name__ == "__main__":
     # scrape_live_quote()
 
     print("Scraping daily quote...")
-    scrape_daily_quote(["FR0000133308"], "01/01/2026", "01/03/2026")
+    scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026")
 
     db.close()
