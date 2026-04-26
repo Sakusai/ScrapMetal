@@ -68,14 +68,14 @@ def scrape_boursorama_stock_live(url: str) -> dict:
             data["ticker"] = fullTicker[0]
             data["symbol"] = fullTicker[1]
         except Exception:
-            pass
+            print("Ticker and symbol not found.")
 
         # 2. Stock label
         try:
             title_block = faceplate.locator("h1.c-faceplate__company-title").first
             data["stock_label"] = title_block.locator("a.c-faceplate__company-link").inner_text().strip()
         except Exception:
-            pass
+            print("Stock label not found.")
 
         # 3. Market price & currency & variation
         try:
@@ -90,7 +90,7 @@ def scrape_boursorama_stock_live(url: str) -> dict:
             variation_text = variation_block.locator("span.c-instrument.c-instrument--variation").inner_text().strip()
             data["variation"] = parse_float_fr(variation_text)
         except Exception:
-            pass
+            print("Market price, currency or variation not found.")
 
         # 4. Open & High & Low & Volume
         try:
@@ -101,7 +101,7 @@ def scrape_boursorama_stock_live(url: str) -> dict:
             data["low"] = parse_float_fr(data_block.locator("span.c-instrument.c-instrument--low").first.inner_text().strip())
             data["volume"] = parse_float_fr(data_block.locator("span.c-instrument.c-instrument--totalvolume").first.inner_text().strip())
         except Exception:
-            pass
+            print("Open, High, Low or Volume not found.")
 
         browser.close()
         return data
