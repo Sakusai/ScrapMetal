@@ -44,6 +44,8 @@ def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
         stock.get("volume")
     )
 
+    return id_stock
+
 def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None:
     # Arguments validation
     if not tickers:
