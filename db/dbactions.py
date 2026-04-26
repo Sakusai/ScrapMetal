@@ -108,17 +108,23 @@ class Database:
         self.commit()
 
     def insert_currency(self, code):
-        self.execute("INSERT INTO currency (code) VALUES (?);", (code,))
+        self.execute("INSERT OR IGNORE INTO currency (code) VALUES (?);", (code,))
         self.commit()
-        return self.cursor.lastrowid
+
+        self.execute("SELECT id_currency FROM currency WHERE code = ?;", (code,))
+        row = self.cursor.fetchone()
+        return row[0] if row else None
     
     def insert_stock(self, symbol, label, ticker, boursorama_url, id_currency):
         self.execute("""
-            INSERT INTO stock (symbol, label, ticker, boursorama_url, id_currency) 
+            INSERT OR IGNORE INTO stock (symbol, label, ticker, boursorama_url, id_currency)
             VALUES (?, ?, ?, ?, ?);
         """, (symbol, label, ticker, boursorama_url, id_currency))
         self.commit()
-        return self.cursor.lastrowid
+
+        self.execute("SELECT id_stock FROM stock WHERE ticker = ?;", (ticker,))
+        row = self.cursor.fetchone()
+        return row[0] if row else None
     
     def insert_quote_live(self, id_stock, datetime_collect, market_price, open=None, high=None, low=None, volume_cumulated=None):
         self.execute("""
@@ -128,12 +134,21 @@ class Database:
         self.commit()
         return self.cursor.lastrowid
     
-    def insert_quote_daily(self, id_stock, date, open=None, high=None, low=None, close=None, volume_total=None):
+    def upsert_quote_daily(self, id_stock, date, open=None, high=None, low=None, close=None, volume_total=None):
         self.execute("""
-            INSERT INTO quote_daily (id_stock, date, open, high, low, close, volume_total) 
-            VALUES (?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO quote_daily (id_stock, date, open, high, low, close, volume_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id_stock, date) DO UPDATE SET
+                open = excluded.open,
+                high = excluded.high,
+                low = excluded.low,
+                close = excluded.close,
+                volume_total = excluded.volume_total;
         """, (id_stock, date, open, high, low, close, volume_total))
         self.commit()
-        return self.cursor.lastrowid
+
+        self.execute("SELECT id_daily_quote FROM quote_daily WHERE id_stock = ? AND date = ?;", (id_stock, date))
+        row = self.cursor.fetchone()
+        return row[0] if row else None
     
     
