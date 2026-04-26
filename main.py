@@ -15,8 +15,9 @@ def init(purgeOnly: bool = False):
     db.insert_currency("EUR")
     print("DB > Données de base initialisées avec succès !\n")
 
-def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
-    stock = scrape_boursorama_stock_live(url)
+def scrape_live_quote(ticker: str, url: str = None) -> int:
+    finalurl = f"https://www.boursorama.com/cours/{ticker}/" if url is None else url
+    stock = scrape_boursorama_stock_live(finalurl)
     print(stock)
 
     db.cursor.execute("SELECT id_stock FROM stock WHERE ticker = ?", (stock.get("ticker"),))
@@ -30,7 +31,7 @@ def scrape_live_quote(url="https://www.boursorama.com/cours/1rPORA/"):
             ticker=stock["ticker"], 
             symbol=stock["symbol"], 
             label=stock["stock_label"], 
-            boursorama_url=url, 
+            boursorama_url=finalurl, 
             id_currency=id_currency #Currency EUR by default, but could be automated
         )
 
