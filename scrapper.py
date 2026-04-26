@@ -106,34 +106,52 @@ def scrape_boursorama_stock_live(url: str) -> dict:
         browser.close()
         return data
     
+def has_download_form(page) -> bool:
+    return page.locator('form[name="quote_search"]').count() == 1
+
 def scrape_boursorama_stock_daily(ticker: str) -> dict:
-    """
-    Scrape a Boursorama stock's daily data.
-    Compatible with such Tickers : FR0000133308
-
-    Returns a Dict : {ticker, stock_label, date, open, high, low, close,volume}
-    """
-
-    if not path.exists("playwright/.auth/state.json"):
-        authenticate()
-    else:
-        print("Using existing authentication state...")
+    storage_path = "playwright/.auth/state.json"
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
+        browser = pw.chromium.launch(headless=False)
 
-        context = browser.new_context(
-            user_agent=(
+        context_args = {
+            "user_agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            storage_state="playwright/.auth/state.json"
-        )
+            )
+        }
+
+        if path.exists(storage_path):
+            context_args["storage_state"] = storage_path
+
+        context = browser.new_context(**context_args)
         page = context.new_page()
 
+        # Try direct access
         url = "https://www.boursorama.com/espace-membres/telecharger-cours/paris"
         load_page(page, url)
+
+        # If no form found, re-authenticate in the same page/session
+        if not has_download_form(page):
+            print("Session invalid or expired, re-authentification...")
+
+            ok = authenticate(page, context)
+            if not ok:
+                browser.close()
+                raise RuntimeError("Authentication failed.")
+
+            # Retry accessing the member page
+            load_page(page, url)
+
+            if not has_download_form(page):
+                browser.close()
+                raise RuntimeError("Authenticated, but download form still not found.")
+
+        # Suppose the form exists
+        form = page.locator('form[name="quote_search"]').first
+        print("Form OK:", form.count())
 
         data = {
             "ticker": None,
@@ -146,10 +164,7 @@ def scrape_boursorama_stock_daily(ticker: str) -> dict:
             "volume": None,
         }
 
-        form = page.locator('form[name="quote_search"]').first
-        print(form.count())
-
-        #TODO
+        #TODO: fill the form with the ticker, submit it, wait for results, parse results
 
         browser.close()
         return data
