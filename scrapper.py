@@ -105,7 +105,31 @@ def scrape_boursorama_stock_live(url: str) -> dict:
 
         browser.close()
         return data
+def scrape_boursorama_stock_forum(url: str) -> dict:
+    """
+    Scrape a Boursorama stock's forum data.
+    Compatible with such URLs : https://www.boursorama.com/forum/1rP74SW/
+
+    Returns a Dict : {collected_at, stock_label, ticker, url, forum_title, forum_description}
+    """
     
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        )
+        context = browser.new_context(**context_args)
+        page = context.new_page()
+
+        # Try direct access
+        url = "https://www.boursorama.com/forum/1rP74SW/"
+        load_page(page, url)
+        collected_at = datetime.now()   
+        
 def has_download_form(page) -> bool:
     return page.locator('form[name="quote_search"]').count() == 1
 
