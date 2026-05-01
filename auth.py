@@ -34,6 +34,8 @@ def authenticate(page, context) -> bool:
     logged_in_member_name = topbar.locator("span.c-link-media__content.c-navigation__header-logged-member")
 
     if logged_in_member_name.inner_text().strip().upper() == username.upper():
+        if not os.path.exists("playwright/.auth"):
+            os.makedirs("playwright/.auth")
         context.storage_state(path="playwright/.auth/state.json")
         print("Authenticated successfully !")
         return True
