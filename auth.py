@@ -5,7 +5,7 @@ import os
 
 load_dotenv(".env")
 
-def authenticate() -> StorageState:
+def authenticate(page, context) -> bool:
     print("Authenticating...")
 
     username = os.getenv("BOURSO_USERNAME")
@@ -13,35 +13,30 @@ def authenticate() -> StorageState:
 
     if not username or not password:
         raise ValueError("BOURSO_USERNAME and BOURSO_PASSWORD environment variables are required.")
+    
+    page.goto('https://www.boursorama.com/', wait_until="domcontentloaded")
+    page.wait_for_load_state("networkidle")
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False, slow_mo=200)
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            )
-        )
-        page =  context.new_page()
-        
-        page.goto('https://www.boursorama.com/', wait_until="domcontentloaded", timeout=30_000)
+    # Check cookies not necessary because we use dispatch_event("click"), bypasses the interface and directly triggers the event
 
-        page.locator("span.didomi-continue-without-agreeing").click()
+    page.locator("#login-member").dispatch_event("click")
 
-        page.locator("#login-member").click()
+    page.locator("#login_member_login").fill(username)
+    page.locator("#login_member_password").fill(password)
 
-        page.locator("#login_member_login").fill(username)
-        page.locator("#login_member_password").fill(password)
+    page.locator("body").dispatch_event("click")
+    page.wait_for_timeout(500)
 
-        page.locator("body").click()
-        page.wait_for_timeout(500)
+    page.locator("#login_member_connect").dispatch_event("click")
+    page.wait_for_load_state("networkidle")
 
-        page.locator("#login_member_connect").click(force=True)
+    topbar = page.locator("div.topbar-header__full")
+    logged_in_member_name = topbar.locator("span.c-link-media__content.c-navigation__header-logged-member")
 
-        page.wait_for_load_state("networkidle")
-
+    if logged_in_member_name.inner_text().strip().upper() == username.upper():
         context.storage_state(path="playwright/.auth/state.json")
-        browser.close()
-
-    print("Authenticated successfully !")
+        print("Authenticated successfully !")
+        return True
+    else:
+        print("Authentication failed.")
+        return False
