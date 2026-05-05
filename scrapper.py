@@ -172,7 +172,7 @@ def scrape_boursorama_stock_forum(url: str) -> list[dict]:
         current_list_url = url
         page_num = 0
         while current_list_url:
-            if page_num >= 1:    
+            if page_num >= 10:    
                 break
             page_num += 1
             load_page(page, current_list_url)
@@ -238,7 +238,7 @@ def scrape_boursorama_stock_forum(url: str) -> list[dict]:
                         print(f"  Erreur lecture message : {e}")
                         continue
 
-                current_topic_url = None  # Pas de pagination dans les topics
+                current_topic_url = None  
 
             print(f"  → {len(topic['comments'])} message(s)")
 

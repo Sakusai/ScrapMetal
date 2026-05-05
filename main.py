@@ -146,8 +146,8 @@ if __name__ == "__main__":
     scrape_live_quote("1rPMC") 
     print("Scraping forum...")
     scrape_forum("FR0000121014")
-    # print("Scraping daily quote...")
-    # scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026") # ORANGE & AIRBUS
+    print("Scraping daily quote...")
+    scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026") # ORANGE & AIRBUS
 
     print("Done !")
 
