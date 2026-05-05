@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from scrapper import scrape_boursorama_stock_daily, scrape_boursorama_stock_live
+from scrapper import scrape_boursorama_stock_daily, scrape_boursorama_stock_forum, scrape_boursorama_stock_live
 
 import re
 import db.dbactions as dba
@@ -103,15 +103,51 @@ def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None
             stock[6], # close
             stock[7]  # volume
         )
+def scrape_forum(ticker: str) -> None:
+    stock_row = db.cursor.execute(
+        "SELECT id_stock, boursorama_url FROM stock WHERE ticker = ?", (ticker,)
+    ).fetchone()
 
+    if not stock_row:
+        raise ValueError(f"Ticker {ticker} non trouvé en base. Lance d'abord scrape_live_quote().")
+
+    id_stock      = stock_row[0]
+    boursorama_url = stock_row[1]  
+    print(f"Scraping forum for {ticker} with URL {boursorama_url}...")
+    m = re.search(r"/cours/([^/]+)/", boursorama_url)
+    if not m:
+        raise ValueError(f"Impossible d'extraire le symbol depuis l'URL : {boursorama_url}")
+    
+    symbol = m.group(1)           
+    url    = f"https://www.boursorama.com/bourse/forum/{symbol}/"
+
+    topics = scrape_boursorama_stock_forum(url)
+
+    for topic in topics:
+        id_topic = db.insert_topic(
+            title=topic["title"],
+            date_create=topic["date_create"],
+            author=topic["author"],
+            id_stock=id_stock,
+        )
+        for comment in topic["comments"]:
+            db.insert_comment(
+                content=comment["content"],
+                date_comment=comment["date_comment"],
+                author=comment["author"],
+                id_topic=id_topic,
+            )
+
+    print(f" {len(topics)} topics insérés en base pour {ticker}.")
 if __name__ == "__main__":
     init(purgeOnly=False)
 
     print("Scraping live quote...")
-    scrape_live_quote("FR0000121014") # LVMH
-
-    print("Scraping daily quote...")
-    scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026") # ORANGE & AIRBUS
+    scrape_live_quote("1rPMC") 
+    print("Scraping forum...")
+    scrape_forum("FR0000121014")
+    # print("Scraping daily quote...")
+    # scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026") # ORANGE & AIRBUS
 
     print("Done !")
 

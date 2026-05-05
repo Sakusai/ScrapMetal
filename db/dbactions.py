@@ -82,18 +82,48 @@ class Database:
             );
         """)
         self.commit()
+    def create_table_topic(self):
+            self.execute("""
+                CREATE TABLE IF NOT EXISTS topic (
+                    id_topic INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    date_create TEXT NOT NULL,
+                    author TEXT NOT NULL,
+                    id_stock INTEGER NOT NULL,
+                        
+                    FOREIGN KEY (id_stock) REFERENCES stock (id_stock)
+                );
+            """)
+            self.commit()
 
+    def create_table_comment(self):
+            self.execute("""
+                CREATE TABLE IF NOT EXISTS comment (
+                    id_comment INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content TEXT NOT NULL,
+                    date_comment TEXT NOT NULL,
+                    author TEXT NOT NULL,
+                    id_topic INTEGER NOT NULL,
+                        
+                    FOREIGN KEY (id_topic) REFERENCES topic (id_topic)
+                );
+            """)
+            self.commit()
     def create_tables(self):
         self.create_table_currency()
         self.create_table_stock()
         self.create_table_quote_live()
         self.create_table_quote_daily()
+        self.create_table_topic()
+        self.create_table_comment()
 
     def drop_tables(self):
         self.execute("DROP TABLE IF EXISTS quote_live;")
         self.execute("DROP TABLE IF EXISTS quote_daily;")
         self.execute("DROP TABLE IF EXISTS stock;")
         self.execute("DROP TABLE IF EXISTS currency;")
+        self.execute("DROP TABLE IF EXISTS comment;")
+        self.execute("DROP TABLE IF EXISTS topic;")
         self.commit()
     
     def recreate_tables(self):
@@ -105,6 +135,8 @@ class Database:
         self.execute("DELETE FROM quote_daily;")
         self.execute("DELETE FROM stock;")
         self.execute("DELETE FROM currency;")
+        self.execute("DELETE FROM comment;")
+        self.execute("DELETE FROM topic;")
         self.commit()
 
     def insert_currency(self, code):
@@ -131,6 +163,22 @@ class Database:
             INSERT INTO quote_live (id_stock, datetime_collect, market_price, open, high, low, volume_cumulated) 
             VALUES (?, ?, ?, ?, ?, ?, ?);
         """, (id_stock, datetime_collect, market_price, open, high, low, volume_cumulated))
+        self.commit()
+        return self.cursor.lastrowid
+    
+    def insert_topic(self, title, date_create, author, id_stock):
+        self.execute("""
+            INSERT INTO topic (title, date_create, author, id_stock)
+            VALUES (?, ?, ?, ?);
+        """, (title, date_create, author, id_stock))
+        self.commit()
+        return self.cursor.lastrowid
+    
+    def insert_comment(self, content, date_comment, author, id_topic):
+        self.execute("""
+            INSERT INTO comment (content, date_comment, author, id_topic)
+            VALUES (?, ?, ?, ?);
+        """, (content, date_comment, author, id_topic))
         self.commit()
         return self.cursor.lastrowid
     

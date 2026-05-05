@@ -105,7 +105,145 @@ def scrape_boursorama_stock_live(url: str) -> dict:
 
         browser.close()
         return data
-    
+def scrape_boursorama_stock_forum(url: str) -> list[dict]:
+    """
+    Scrape a Boursorama stock's forum data.
+    Compatible with such URLs : https://www.boursorama.com/bourse/forum/1rPABCA/
+
+    Returns a list of dicts : [
+        {
+            "title": str,
+            "date_create": str,      
+            "author": str,
+            "url": str,
+            "comments": [
+                {
+                    "content": str,
+                    "date_comment": str, 
+                    "author": str,
+                }
+            ]
+        },
+        ...
+    ]
+    """
+
+    def parse_boursorama_date(raw: str) -> str:
+        raw   = raw.strip()
+        today = datetime.now()  
+        MOIS = {
+            "janv": 1, "févr": 2, "mars": 3, "avr": 4, "mai": 5, "juin": 6,
+            "juil": 7, "août": 8, "sept": 9, "oct": 10, "nov": 11, "déc": 12
+        }
+        if raw.lower().startswith("aujourd"):
+            m = re.search(r"(\d{1,2})[h:](\d{2})", raw)
+            if m:
+                return today.replace(
+                    hour=int(m.group(1)), minute=int(m.group(2)), second=0, microsecond=0
+                ).strftime("%Y-%m-%d %H:%M:%S")
+
+        if raw.lower().startswith("hier"):
+            m = re.search(r"(\d{1,2})[h:](\d{2})", raw)
+            if m:
+                return (today - timedelta(days=1)).replace(
+                    hour=int(m.group(1)), minute=int(m.group(2)), second=0, microsecond=0
+                ).strftime("%Y-%m-%d %H:%M:%S")
+
+        m = re.search(r"(\d{1,2})\s+(\w+\.?)\s+(\d{4})\s+[•·]\s+(\d{2}):(\d{2})", raw)
+        if m:
+            d, mo_str, y, h, mn = m.groups()
+            mo = MOIS.get(mo_str.rstrip("."), 1)
+            return f"{y}-{mo:02d}-{int(d):02d} {h}:{mn}:00"
+
+        return raw
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        )
+        page = context.new_page()
+
+        topics_data      = []
+        current_list_url = url
+        page_num = 0
+        while current_list_url:
+            if page_num >= 1:    
+                break
+            page_num += 1
+            load_page(page, current_list_url)
+            print(current_list_url)
+            topic_rows = page.locator("tr.c-table__row:has(a.c-link--bold[href*='/forum/'])").all()            
+            if not topic_rows:
+                print("Aucun topic trouvé sur cette page.")
+                break
+            print(f"{len(topic_rows)} topic(s) trouvés sur la page.")
+            for topic_row in topic_rows:
+                try:
+                    link      = topic_row.locator("a.c-link--bold[href*='/forum/']").first
+                    title     = link.inner_text().strip()
+                    href      = link.get_attribute("href")
+                    topic_url = href if href.startswith("http") else f"https://www.boursorama.com{href}"
+
+                    author    = topic_row.locator("div.c-source button.c-source__username").first.inner_text().strip()
+
+                    raw_date  = topic_row.locator("span.c-source__time").first.inner_text().strip()
+
+                    topics_data.append({
+                        "title":       title,
+                        "date_create": parse_boursorama_date(raw_date),
+                        "author":      author,
+                        "url":         topic_url,
+                        "comments":    [],
+                    })
+                except Exception as e:
+                        print(f"Erreur lecture topic : {e}")
+                        continue
+
+            next_btn = page.locator("a.c-pagination__link--mobile[aria-label='Page suivante']").first
+            if next_btn.count() and next_btn.get_attribute("href"):
+                href = next_btn.get_attribute("href")
+                current_list_url = href if href.startswith("http") else f"https://www.boursorama.com{href}"
+            else:
+                current_list_url = None
+
+        for i, topic in enumerate(topics_data):
+            print(f"Topic {i+1}/{len(topics_data)} : {topic['title']}")
+            current_topic_url = topic["url"]
+          
+
+            while current_topic_url:
+                load_page(page, current_topic_url)
+
+
+                for block in page.locator("ul[data-load-more-content] > li > div.c-message").all():
+                    try:
+                        content = block.locator("> p.c-message__text").first.inner_text().strip()
+                        author  = block.locator("div.c-profile-card__name button").first.inner_text().strip()
+
+                        time_spans = block.locator("div.c-source span.c-source__time").all()
+                        raw_date   = " • ".join([s.inner_text().strip() for s in time_spans])
+
+                        topic["comments"].append({
+                            "content":      content,
+                            "date_comment": parse_boursorama_date(raw_date),
+                            "author":       author,
+                        })
+
+                    except Exception as e:
+                        print(f"  Erreur lecture message : {e}")
+                        continue
+
+                current_topic_url = None  # Pas de pagination dans les topics
+
+            print(f"  → {len(topic['comments'])} message(s)")
+
+        browser.close()
+        return topics_data
 def has_download_form(page) -> bool:
     return page.locator('form[name="quote_search"]').count() == 1
 
