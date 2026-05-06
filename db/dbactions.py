@@ -118,12 +118,12 @@ class Database:
         self.create_table_comment()
 
     def drop_tables(self):
+        self.execute("DROP TABLE IF EXISTS comment;")
+        self.execute("DROP TABLE IF EXISTS topic;")
         self.execute("DROP TABLE IF EXISTS quote_live;")
         self.execute("DROP TABLE IF EXISTS quote_daily;")
         self.execute("DROP TABLE IF EXISTS stock;")
         self.execute("DROP TABLE IF EXISTS currency;")
-        self.execute("DROP TABLE IF EXISTS comment;")
-        self.execute("DROP TABLE IF EXISTS topic;")
         self.commit()
     
     def recreate_tables(self):

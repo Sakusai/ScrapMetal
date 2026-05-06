@@ -105,6 +105,7 @@ def scrape_boursorama_stock_live(url: str) -> dict:
 
         browser.close()
         return data
+
 def scrape_boursorama_stock_forum(url: str) -> list[dict]:
     """
     Scrape a Boursorama stock's forum data.
@@ -172,17 +173,21 @@ def scrape_boursorama_stock_forum(url: str) -> list[dict]:
         current_list_url = url
         page_num = 0
         while current_list_url:
-            if page_num >= 10:    
+            if page_num >= 1:    # Topic pages limited to 1 for now, to avoid excessive scraping during dev
                 break
             page_num += 1
             load_page(page, current_list_url)
-            print(current_list_url)
+            print("     " + current_list_url)
             topic_rows = page.locator("tr.c-table__row:has(a.c-link--bold[href*='/forum/'])").all()            
             if not topic_rows:
                 print("Aucun topic trouvé sur cette page.")
                 break
             print(f"{len(topic_rows)} topic(s) trouvés sur la page.")
+            topic_count = 0
             for topic_row in topic_rows:
+                topic_count += 1
+                if topic_count > 10:    # Limit to 10 topics per page for now, to avoid excessive scraping during dev
+                    break
                 try:
                     link      = topic_row.locator("a.c-link--bold[href*='/forum/']").first
                     title     = link.inner_text().strip()
@@ -244,6 +249,7 @@ def scrape_boursorama_stock_forum(url: str) -> list[dict]:
 
         browser.close()
         return topics_data
+
 def has_download_form(page) -> bool:
     return page.locator('form[name="quote_search"]').count() == 1
 

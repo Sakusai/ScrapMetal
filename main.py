@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from scrapper import scrape_boursorama_stock_daily, scrape_boursorama_stock_forum, scrape_boursorama_stock_live
+from playwright.sync_api import sync_playwright
 
 import re
 import db.dbactions as dba
@@ -103,20 +104,46 @@ def scrape_daily_quote(tickers: list[str], dateStart: str, dateEnd: str) -> None
             stock[6], # close
             stock[7]  # volume
         )
+
+def resolve_boursorama_quote_url(url: str) -> str:
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        )
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle")
+        final_url = page.url
+        browser.close()
+        return final_url
+
 def scrape_forum(ticker: str) -> None:
     stock_row = db.cursor.execute(
         "SELECT id_stock, boursorama_url FROM stock WHERE ticker = ?", (ticker,)
     ).fetchone()
 
     if not stock_row:
-        raise ValueError(f"Ticker {ticker} non trouvé en base. Lance d'abord scrape_live_quote().")
+        id_stock = scrape_live_quote(ticker)
+        print(f"Ticker {ticker} inséré en base avec id {id_stock}.")
+        if id_stock is None:
+            raise ValueError(f"Impossible d'insérer le stock pour le ticker {ticker}.")
+        boursorama_url = db.cursor.execute(
+            "SELECT boursorama_url FROM stock WHERE id_stock = ?", (id_stock,)
+        ).fetchone()[0]
+    else:
+        id_stock = stock_row[0]
+        boursorama_url = stock_row[1]
 
-    id_stock      = stock_row[0]
-    boursorama_url = stock_row[1]  
-    print(f"Scraping forum for {ticker} with URL {boursorama_url}...")
-    m = re.search(r"/cours/([^/]+)/", boursorama_url)
+    resolved_url = resolve_boursorama_quote_url(boursorama_url)
+
+    print(f"Scraping forum for {ticker} with URL {resolved_url}...")
+    m = re.search(r"/cours/([^/]+)/", resolved_url)
     if not m:
-        raise ValueError(f"Impossible d'extraire le symbol depuis l'URL : {boursorama_url}")
+        raise ValueError(f"Impossible d'extraire le symbol depuis l'URL : {resolved_url}")
     
     symbol = m.group(1)           
     url    = f"https://www.boursorama.com/bourse/forum/{symbol}/"
@@ -139,13 +166,16 @@ def scrape_forum(ticker: str) -> None:
             )
 
     print(f" {len(topics)} topics insérés en base pour {ticker}.")
+
 if __name__ == "__main__":
     init(purgeOnly=False)
 
     print("Scraping live quote...")
     scrape_live_quote("1rPMC") 
+
     print("Scraping forum...")
-    scrape_forum("FR0000121014")
+    scrape_forum("FR0000121014") # LVMH
+
     print("Scraping daily quote...")
     scrape_daily_quote(["FR0000133308", "NL0000235190"], "01/01/2026", "01/03/2026") # ORANGE & AIRBUS
 
